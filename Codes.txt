@@ -1,0 +1,493 @@
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+SET AUTOCOMMIT = 0;
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+Database: `pharmacy`
+
+Procedures
+
+DELIMITER $$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `EXPIRY` ()  NO SQL
+BEGIN
+SELECT p_id,sup_id,med_id,p_qty,p_cost,pur_date,mfg_date,exp_date FROM purchase where exp_date between CURDATE() and DATE_SUB(CURDATE(), INTERVAL -6 MONTH);
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `SEARCH\_INVENTORY` (IN `search` VARCHAR(255))  NO SQL
+BEGIN
+DECLARE mid DECIMAL(6);
+DECLARE mname VARCHAR(50);
+DECLARE mqty INT;
+DECLARE mcategory VARCHAR(20);
+DECLARE mprice DECIMAL(6,2);
+DECLARE location VARCHAR(30);
+DECLARE exit_loop BOOLEAN DEFAULT FALSE;
+DECLARE MED_CURSOR CURSOR FOR SELECT MED_ID,MED_NAME,MED_QTY,CATEGORY,MED_PRICE,LOCATION_RACK FROM MEDS;
+DECLARE CONTINUE HANDLER FOR NOT FOUND SET exit_loop=TRUE;
+CREATE TEMPORARY TABLE IF NOT EXISTS T1 (medid decimal(6),medname varchar(50),medqty int,medcategory varchar(20),medprice decimal(6,2),medlocation varchar(30));
+OPEN MED_CURSOR;
+med_loop: LOOP
+FETCH FROM MED_CURSOR INTO mid,mname,mqty,mcategory,mprice,location;
+IF exit_loop THEN
+LEAVE med_loop;
+END IF;
+
+IF(CONCAT(mid,mname,mcategory,location) LIKE CONCAT('%',search,'%')) THEN
+INSERT INTO T1(medid,medname,medqty,medcategory,medprice,medlocation)
+VALUES(mid,mname,mqty,mcategory,mprice,location);
+END IF;
+END LOOP med_loop;
+CLOSE MED_CURSOR;
+SELECT medid,medname,medqty,medcategory,medprice,medlocation FROM T1;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `STOCK` ()  NO SQL
+BEGIN
+SELECT med_id, med_name,med_qty,category,med_price,location_rack FROM meds where med_qty<=50;
+END$$
+
+CREATE DEFINER=`root`@`localhost` PROCEDURE `TOTAL\_AMT` (IN `ID` INT, OUT `AMT` DECIMAL(8,2))  NO SQL
+BEGIN
+UPDATE SALES SET S_DATE=SYSDATE(),S_TIME=CURRENT_TIMESTAMP(),TOTAL_AMT=(SELECT SUM(TOT_PRICE) FROM SALES_ITEMS WHERE SALES_ITEMS.SALE_ID=ID) WHERE SALES.SALE_ID=ID;
+SELECT TOTAL_AMT INTO AMT FROM SALES WHERE SALE_ID=ID;
+END$$
+
+
+Functions
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `P\_AMT` (`start` DATE, `end` DATE) RETURNS DECIMAL(8,2) NO SQL
+    DETERMINISTIC
+BEGIN
+DECLARE PAMT DECIMAL(8,2) DEFAULT 0.0;
+SELECT SUM(P_COST) INTO PAMT FROM PURCHASE WHERE PUR_DATE >= start AND PUR_DATE<= end;
+RETURN PAMT;
+END$$
+
+CREATE DEFINER=`root`@`localhost` FUNCTION `S\_AMT` (`start` DATE, `end` DATE) RETURNS DECIMAL(8,2) NO SQL
+BEGIN
+DECLARE SAMT DECIMAL(8,2) DEFAULT 0.0;
+SELECT SUM(TOTAL_AMT) INTO SAMT FROM SALES WHERE S_DATE >= start AND S_DATE<= end;
+RETURN SAMT;
+END$$
+
+DELIMITER ;
+
+
+
+Table structure for table `admin`:
+
+CREATE TABLE `admin` (
+  `ID` decimal(7,0) NOT NULL,
+  `A\_USERNAME` varchar(50) NOT NULL,
+  `A\_PASSWORD` varchar(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `admin` (`ID`, `A\_USERNAME`, `A\_PASSWORD`) VALUES
+('1', 'admin', 'password');
+
+
+
+
+Table structure for table `customer`
+
+CREATE TABLE `customer` (
+  `C\_ID` decimal(6,0) NOT NULL,
+  `C\_FNAME` varchar(30) NOT NULL,
+  `C\_LNAME` varchar(30) DEFAULT NULL,
+  `C\_AGE` int(11) NOT NULL,
+  `C\_SEX` varchar(6) NOT NULL,
+  `C\_PHNO` decimal(10,0) NOT NULL,
+  `C\_MAIL` varchar(40) DEFAULT NULL
+) ;
+
+
+INSERT INTO customer (C_ID, C_FNAME, C_LNAME, C_AGE, C_SEX, C_PHNO, C_MAIL) VALUES
+(987101, 'Safia', 'Malik', 22, 'Female', '9632587415', 'safia@gmail.com'),
+(987102, 'Varun', 'Ilango', 24, 'Male', '9987565423', 'varun@gmail.com'),
+(987103, 'Suja', 'Suresh', 45, 'Female', '7896541236', 'suja@hotmail.com'),
+(987104, 'Agatha', 'Elizabeth', 30, 'Female', '7845129635', 'agatha@gmail.com'),
+(987105, 'Zayed', 'Shah', 40, 'Male', '6789541235', 'zshah@hotmail.com'),
+(987106, 'Vijay', 'Kumar', 60, 'Male', '8996574123', 'vijayk@yahoo.com'),
+(987107, 'Meera', 'Das', 35, 'Female', '7845963259', 'meera@gmail.com'),
+(987112, 'Sachin', 'Sarker', 23, 'Male', '1631103235', 'sachin.sarker99@gmail.com'),
+(987113, 'Tasif', 'Anwar', 23, 'Male', '1648976589', 'tasif222@gmail.com'),
+(987114, 'Rayan', 'Ahamed', 23, 'Male', '1876467845', 'rayan33@gmail.com');
+
+
+
+Table structure for table `emplogin`:
+
+CREATE TABLE `emplogin` (
+  `E\_ID` decimal(7,0) NOT NULL,
+  `E\_USERNAME` varchar(20) NOT NULL,
+  `E\_PASS` varchar(30) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO emplogin (E_ID, E_USERNAME, E_PASS) VALUES
+(4567002, 'anita', 'pass2'),
+(4567005, 'Arpita', 'pass5'),
+(4567010, 'daniel', 'pass10'),
+(4567003, 'deep', 'pass3'),
+(4567001, 'John', 'pass1'),
+(4567009, 'shayla', 'pass9'),
+(4567006, 'shoaim', 'pass6');
+
+
+Table structure for table `employee`:
+
+CREATE TABLE `employee` (
+  `E\_ID` decimal(7,0) NOT NULL,
+  `E\_FNAME` varchar(30) NOT NULL,
+  `E\_LNAME` varchar(30) DEFAULT NULL,
+  `BDATE` date NOT NULL,
+  `E\_AGE` int(11) NOT NULL,
+  `E\_SEX` varchar(6) NOT NULL,
+  `E\_TYPE` varchar(20) NOT NULL,
+  `E\_JDATE` date NOT NULL,
+  `E\_SAL` decimal(8,2) NOT NULL,
+  `E\_PHNO` decimal(10,0) NOT NULL,
+  `E\_MAIL` varchar(40) DEFAULT NULL,
+  `E\_ADD` varchar(40) DEFAULT NULL
+) ;
+
+INSERT INTO employee (E_ID, E_FNAME, E_LNAME, BDATE, E_AGE, E_SEX, E_TYPE, E_JDATE, E_SAL, E_PHNO, E_MAIL, E_ADD) VALUES
+(1, 'Admin', '-', '1989-05-24', 30, 'Male', 'Admin', '2009-06-24', 95000.00, '9874563219', 'admin@pharmacia.com', 'Dhaka'),
+(4567001, 'John', 'Smith', '1995-10-05', 25, 'Male', 'Pharmacist', '2025-08-14', 25000.00, '1831103325', 'John@gmail.com', 'Uttara'),
+(4567002, 'Anita', 'Shree', '2000-10-03', 20, 'Female', 'Pharmacist', '2025-08-14', 45000.00, '8546123566', 'anita@gmail.com', 'Chittagong'),
+(4567003, 'Deep', 'Mitra', '1998-02-01', 22, 'Male', 'Pharmacist', '2024-02-06', 21000.00, '7854123694', 'deep@gmail.com', 'Barishal'),
+(4567004, 'Sachin', 'Sarker', '1990-02-16', 34, 'Male', 'Manager', '2025-02-14', 50000.00, '1531103320', 'sachin9@gmail.com', 'Gazipur'),
+(4567005, 'Arpita', 'Sarker', '1992-01-02', 28, 'Female', 'Pharmacist', '2017-05-16', 32000.00, '7894532156', 'arpita@gmail.com', 'Gazipur'),
+(4567006, 'Sajid', 'Ahmed', '1999-12-11', 20, 'Male', 'Pharmacist', '2018-09-05', 28000.00, '7896541234', 'sajid@hotmail.com', 'Mirpur'),
+(4567009, 'Shayla', 'Hussain', '1980-02-28', 40, 'Female', 'Manager', '2010-05-06', 80000.00, '7854123695', 'shayla@gmail.com', 'Dhaka'),
+(4567010, 'Daniel', 'James', '1993-04-05', 27, 'Male', 'Pharmacist', '2016-01-05', 30000.00, '7896541235', 'daniels@gmail.com', 'Sylhet'),
+(4567011, 'Shadman', 'Shawm', '1998-03-12', 27, 'Male', 'Pharmacist', '2025-06-15', 18000.00, '1538953768', 'shawn22@gmail.com', 'Comilla'),
+(4567012, 'Nafis', 'Sadiq', '1999-01-01', 26, 'Male', 'Pharmacist', '2025-08-16', 20000.00, '1631103325', 'nafis22@gmail.com', 'Mirpur');
+
+
+
+
+Table structure for table `meds`:
+CREATE TABLE `meds` (
+  `MED\_ID` decimal(6,0) NOT NULL,
+  `MED\_NAME` varchar(50) NOT NULL,
+  `MED\_QTY` int(11) NOT NULL,
+  `CATEGORY` varchar(20) DEFAULT NULL,
+  `MED\_PRICE` decimal(6,2) NOT NULL,
+  `LOCATION\_RACK` varchar(30) DEFAULT NULL
+) ;
+
+
+INSERT INTO meds (MED_ID, MED_NAME, MED_QTY, CATEGORY, MED_PRICE, LOCATION_RACK) VALUES
+(123001, 'Dolo 650 MG', 520, 'Tablet', 2.00, 'rack 6'),
+(123002, 'Panadol Cold & Flu', 80, 'Tablet', 2.50, 'rack 1'),
+(123003, 'Livogen', 5, 'Capsule', 5.00, 'rack 3'),
+(123004, 'Gelusil', 400, 'Tablet', 1.25, 'rack 4'),
+(123005, 'Cyclopam', 50, 'Tablet', 6.00, 'rack 2'),
+(123006, 'Benadryl 200 ML', 200, 'Syrup', 50.00, 'rack 10'),
+(123007, 'Lopamide', 15, 'Capsule', 5.00, 'rack 7'),
+(123008, 'Vitamic C', 590, 'Tablet', 3.00, 'rack 8'),
+(123009, 'Omeprazole', 35, 'Capsule', 5.00, 'rack 3'),
+(123010, 'Concur 5 MG', 590, 'Tablet', 3.50, 'rack 9'),
+(123011, 'Augmentin 250 ML', 80, 'Syrup', 60.00, 'rack 7'),
+(123012, 'Napa', 800, 'Tablet', 10.00, 'rack 4'),
+(123013, 'Esoral 20', 140, 'Tablet', 12.00, 'rack 10'),
+(123014, 'Mkast-20', 340, 'Tablet', 15.00, 'rack 3'),
+(123015, 'Tusca Plus', 24, 'Syrup', 100.00, 'rack 1'),
+(123016, 'Tamen', 880, 'Tablet', 2.00, 'rack 10'),
+(123017, 'Angilock-50', 380, 'Tablet', 15.00, 'rack 4'),
+(123018, 'Fenadin-20', 60, 'Tablet', 6.00, 'rack 1'),
+(123019, 'Tritas-5', 500, 'Tablet', 8.00, 'rack 1'),
+(123020, 'Dexpoten', 20, 'Syrup', 80.00, 'rack 3');
+
+
+
+
+
+Table structure for table `purchase`:
+
+CREATE TABLE `purchase` (
+  `P\_ID` decimal(4,0) NOT NULL,
+  `SUP\_ID` decimal(3,0) NOT NULL,
+  `MED\_ID` decimal(6,0) NOT NULL,
+  `P\_QTY` int(11) NOT NULL,
+  `P\_COST` decimal(8,2) NOT NULL,
+  `PUR\_DATE` date NOT NULL,
+  `MFG\_DATE` date NOT NULL,
+  `EXP\_DATE` date NOT NULL
+) ;
+
+
+
+INSERT INTO purchase (P_ID, SUP_ID, MED_ID, P_QTY, P_COST, PUR_DATE, MFG_DATE, EXP_DATE) VALUES
+(1001, 136, 123010, 200, 1500.50, '2023-06-01', '2022-02-05', '2025-08-14'),
+(1002, 123, 123002, 100, 3000.00, '2024-02-04', '2023-12-01', '2025-08-14'),
+(1003, 145, 123006, 20, 800.00, '2024-02-01', '2023-12-01', '2026-07-01'),
+(1004, 156, 123004, 250, 1000.00, '2024-04-02', '2022-05-06', '2025-05-06'),
+(1005, 123, 123005, 200, 1200.00, '2024-02-01', '2023-02-01', '2028-02-01'),
+(1006, 162, 123010, 50, 1500.00, '2025-04-22', '2023-01-01', '2025-05-02'),
+(1007, 123, 123001, 500, 450.00, '2024-01-02', '2025-03-06', '2028-03-06'),
+(1008, 111, 123008, 500, 1000.00, '2025-03-11', '2022-01-12', '2028-12-12'),
+(1009, 117, 123013, 100, 1400.00, '2025-07-01', '2025-01-07', '2027-01-07'),
+(1010, 117, 123014, 200, 3000.00, '2025-02-02', '2024-02-01', '2027-02-01'),
+(1011, 777, 123017, 300, 4000.00, '2025-02-01', '2023-06-01', '2028-07-02'),
+(1015, 136, 123006, 200, 1500.00, '2025-08-01', '2025-08-02', '2028-08-02');
+
+
+
+Triggers `purchase`:
+
+DELIMITER $$
+CREATE TRIGGER `QTYDELETE` AFTER DELETE ON `purchase` FOR EACH ROW BEGIN
+UPDATE meds SET MED_QTY=MED_QTY-old.P_QTY WHERE meds.MED_ID=old.MED_ID;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `QTYINSERT` AFTER INSERT ON `purchase` FOR EACH ROW BEGIN
+UPDATE meds SET MED_QTY=MED_QTY+new.P_QTY WHERE meds.MED_ID=new.MED_ID;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `QTYUPDATE` AFTER UPDATE ON `purchase` FOR EACH ROW BEGIN
+UPDATE meds SET MED_QTY=MED_QTY-old.P_QTY WHERE meds.MED_ID=new.MED_ID;
+UPDATE meds SET MED_QTY=MED_QTY+new.P_QTY WHERE meds.MED_ID=new.MED_ID;
+END
+$$
+DELIMITER ;
+
+
+
+
+Table structure for table `sales`:
+
+CREATE TABLE `sales` (
+  `SALE\_ID` int(11) NOT NULL,
+  `C\_ID` decimal(6,0) NOT NULL,
+  `S\_DATE` date DEFAULT NULL,
+  `S\_TIME` time DEFAULT NULL,
+  `TOTAL\_AMT` decimal(8,2) DEFAULT NULL,
+  `E\_ID` decimal(7,0) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+INSERT INTO sales (SALE_ID, C_ID, s_date, s_time, TOTAL_AMT, E_ID) VALUES
+(1, 987101, '2020-04-15 13:23:03', NULL, 180.00, 4567009),
+(2, 987106, '2020-04-21 13:23:03', NULL, 585.00, 4567004),
+(3, 987103, '2020-04-15 11:23:53', NULL, 120.00, 4567010),
+(4, 987104, '2020-04-14 18:20:00', NULL, 955.00, 4567006),
+(5, 987103, '2020-04-15 15:24:43', NULL, 45.00, 4567007),
+(6, 987102, '2020-04-23 11:22:35', NULL, 140.00, 4567003),
+(7, 987105, '2020-04-24 00:25:54', NULL, 350.00, 4567001),
+(8, 987104, '2020-04-24 00:47:47', NULL, 35.00, 4567001),
+(12, 987103, '2020-04-19 13:33:16', NULL, 60.00, 4567001),
+(13, 987102, '2020-04-18 19:29:43', NULL, 170.00, 4567001),
+(15, 987107, '2020-12-04 18:39:46', NULL, 420.00, 1),
+(16, 987106, '2020-12-04 18:52:21', NULL, 30.00, 1),
+(17, 987103, '2020-12-04 19:35:56', NULL, 57.50, 1),
+(18, 987105, '2025-08-16 21:36:56', NULL, 180.00, 4567010),
+(20, 987103, '2025-08-16 21:48:51', NULL, 2400.50, 4567001),
+(21, 987103, '2025-08-16 16:49:47', NULL, 2379.50, 4567003),
+(29, 987102, '2025-08-16 17:44:42', NULL, 1040.00, 4567007),
+(30, 987102, '2025-08-16 17:47:50', NULL, 340.00, 4567010),
+(31, 987106, '2025-08-16 17:50:55', NULL, 800.00, 4567007),
+(32, 987104, '2020-04-14 18:20:00', NULL, 955.00, 4567006),
+(33, 987103, '2020-04-15 11:23:53', NULL, 120.00, 4567010);
+
+
+
+Triggers `sales`:
+
+DELIMITER $$
+CREATE TRIGGER `SALE\_ID\_DELETE` BEFORE DELETE ON `sales` FOR EACH ROW BEGIN
+DELETE from sales_items WHERE sales_items.SALE_ID=old.SALE_ID;
+END
+$$
+DELIMITER ;
+
+Table structure for table `sales\_items`:
+
+CREATE TABLE `sales\_items` (
+  `SALE\_ID` int(11) NOT NULL,
+  `MED\_ID` decimal(6,0) NOT NULL,
+  `SALE\_QTY` int(11) NOT NULL,
+  `TOT\_PRICE` decimal(8,2) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+INSERT INTO sales_items (SALE_ID, MED_ID, SALE_QTY, TOT_PRICE) VALUES
+(1, 123001, 20, 20.00),
+(1, 123011, 2, 160.00),
+(2, 123001, 75, 225.00),
+(2, 123005, 60, 120.00),
+(3, 123008, 40, 120.00),
+(4, 123010, 250, 875.00),
+(4, 123011, 1, 80.00),
+(5, 123001, 45, 45.00),
+(5, 123006, 2, 100.00),
+(6, 123003, 10, 40.00),
+(6, 123010, 10, 100.00),
+(7, 123003, 50, 250.00),
+(8, 123018, 10, 10.00),
+(8, 123018, 10, 25.00),
+(12, 123005, 25, 62.50),
+(15, 123005, 45, 270.00),
+(15, 123006, 3, 150.00),
+(16, 123003, 10, 30.00),
+(16, 123010, 10, 30.00),
+(17, 123007, 5, 25.00),
+(17, 123009, 5, 20.00),
+(18, 123011, 2, 160.00),
+(20, 123002, 4, 80.00);
+
+
+
+
+Triggers `sales\_items`:
+
+DELIMITER $$
+CREATE TRIGGER `SALEDELETE` AFTER DELETE ON `sales\_items` FOR EACH ROW BEGIN
+UPDATE meds SET MED_QTY=MED_QTY+old.SALE_QTY WHERE meds.MED_ID=old.MED_ID;
+END
+$$
+DELIMITER ;
+DELIMITER $$
+CREATE TRIGGER `SALEINSERT` AFTER INSERT ON `sales\_items` FOR EACH ROW BEGIN
+UPDATE meds SET MED_QTY=MED_QTY-new.SALE_QTY WHERE meds.MED_ID=new.MED_ID;
+END
+$$
+DELIMITER ;
+
+Table structure for table `suppliers`:
+
+CREATE TABLE `suppliers` (
+  `SUP\_ID` decimal(3,0) NOT NULL,
+  `SUP\_NAME` varchar(25) NOT NULL,
+  `SUP\_ADD` varchar(30) NOT NULL,
+  `SUP\_PHNO` decimal(10,0) NOT NULL,
+  `SUP\_MAIL` varchar(40) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
+INSERT INTO suppliers (SUP_ID, SUP_NAME, SUP_ADD, SUP_PHNO, SUP_MAIL) VALUES
+(111, 'Renata PLC', 'Dhaka', '1836795688', 'renataplc@gmail.com'),
+(113, 'Square Pharmaceuticals PL', 'Dhaka', '1531103236', 'squareplc@gmail.com'),
+(114, 'ACI Limited', 'Narayanganj', '1784537096', 'aciltd@gmail.com'),
+(115, 'ACME Laboratories Ltd.', 'Mirpur', '1336103236', 'acmeltd@gmail.com'),
+(117, 'Drug International Ltd.', 'Dhaka', '1511734926', 'druginltd@gmail.com'),
+(123, 'Beximco Pharmaceuticals L', 'Dhaka', '1831103286', 'Beximco@pharma.com'),
+(136, 'ABC PharmaSupply', 'Gazipur', '1833227658', 'abc@pharmsupp.com'),
+(145, 'Daily Pharma Ltd', 'Dhamrai', '1735378057', 'daily@dpharma.com'),
+(156, 'MedAll', 'Mirpur', '1649835789', 'mainid@medall.com'),
+(162, 'MedHead Pharmaceuticals', 'Tongi', '1576894680', 'abc@pharmsupp.com'),
+(163, 'ORS DRUG LTD', 'Dhaka', '1631103237', 'orsdrug@gmail.com'),
+(777, 'Insepta LTD', 'Gazipur', '1331103235', 'insltd5@gmail.com');
+
+
+
+
+Indexes for table `admin`:
+
+ALTER TABLE `admin`
+  ADD PRIMARY KEY (`A\_USERNAME`),
+  ADD UNIQUE KEY `USERNAME` (`A\_USERNAME`),
+  ADD KEY `ID` (`ID`);
+
+Indexes for table `customer`
+
+ALTER TABLE `customer`
+  ADD PRIMARY KEY (`C\_ID`),
+  ADD UNIQUE KEY `C\_PHNO` (`C\_PHNO`),
+  ADD UNIQUE KEY `C\_MAIL` (`C\_MAIL`);
+
+Indexes for table `emplogin`
+
+ALTER TABLE `emplogin`
+  ADD PRIMARY KEY (`E\_USERNAME`),
+  ADD KEY `E\_ID` (`E\_ID`);
+
+
+Indexes for table `employee`
+
+ALTER TABLE `employee`
+  ADD PRIMARY KEY (`E\_ID`);
+
+
+Indexes for table `meds`
+
+ALTER TABLE `meds`
+  ADD PRIMARY KEY (`MED\_ID`);
+
+
+Indexes for table `purchase`
+
+ALTER TABLE `purchase`
+  ADD PRIMARY KEY (`P\_ID`,`MED\_ID`),
+  ADD KEY `SUP\_ID` (`SUP\_ID`),
+  ADD KEY `MED\_ID` (`MED\_ID`);
+
+
+Indexes for table `sales`
+
+ALTER TABLE `sales`
+  ADD PRIMARY KEY (`SALE\_ID`),
+  ADD KEY `C\_ID` (`C\_ID`),
+  ADD KEY `E\_ID` (`E\_ID`);
+
+
+Indexes for table `sales\_items`
+
+ALTER TABLE `sales\_items`
+  ADD PRIMARY KEY (`SALE\_ID`,`MED\_ID`),
+  ADD KEY `MED\_ID` (`MED\_ID`);
+
+
+Indexes for table `suppliers`
+
+ALTER TABLE `suppliers`
+  ADD PRIMARY KEY (`SUP\_ID`);
+
+
+
+
+ AUTO_INCREMENT for table `sales`
+
+ALTER TABLE `sales`
+  MODIFY `SALE\_ID` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+
+
+
+ Constraints for table `admin`
+
+ALTER TABLE `admin`
+  ADD CONSTRAINT `admin\_ibfk\_1` FOREIGN KEY (`ID`) REFERENCES `employee` (`E\_ID`);
+
+
+ Constraints for table `emplogin`
+
+ALTER TABLE `emplogin`
+  ADD CONSTRAINT `emplogin\_ibfk\_1` FOREIGN KEY (`E\_ID`) REFERENCES `employee` (`E\_ID`);
+
+
+ Constraints for table `purchase`
+
+ALTER TABLE `purchase`
+  ADD CONSTRAINT `purchase\_ibfk\_1` FOREIGN KEY (`SUP\_ID`) REFERENCES `suppliers` (`SUP\_ID`),
+  ADD CONSTRAINT `purchase\_ibfk\_2` FOREIGN KEY (`MED\_ID`) REFERENCES `meds` (`MED\_ID`);
+
+
+ Constraints for table `sales`
+
+ALTER TABLE `sales`
+  ADD CONSTRAINT `sales\_ibfk\_1` FOREIGN KEY (`C\_ID`) REFERENCES `customer` (`C\_ID`),
+  ADD CONSTRAINT `sales\_ibfk\_2` FOREIGN KEY (`E\_ID`) REFERENCES `employee` (`E\_ID`);
+
+
+ Constraints for table `sales\_items`
+
+ALTER TABLE `sales\_items`
+  ADD CONSTRAINT `sales\_items\_ibfk\_1` FOREIGN KEY (`SALE\_ID`) REFERENCES `sales` (`SALE\_ID`),
+  ADD CONSTRAINT `sales\_items\_ibfk\_2` FOREIGN KEY (`MED\_ID`) REFERENCES `meds` (`MED\_ID`);
+COMMIT;
